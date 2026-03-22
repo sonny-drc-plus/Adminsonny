@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SONNY | Panneau Administrateur</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { background: #0f172a; font-family: 'Inter', sans-serif; color: white; }
+        .admin-card { background: #1e293b; border: 1px solid #334155; border-radius: 1.5rem; padding: 20px; margin-bottom: 15px; }
+        .btn-check { background: #22c55e; color: white; padding: 10px 20px; border-radius: 10px; font-weight: 900; font-size: 10px; uppercase; }
+        .btn-delete { background: #ef4444; color: white; padding: 10px 20px; border-radius: 10px; font-weight: 900; font-size: 10px; uppercase; }
+        .tab-admin { flex: 1; text-align: center; padding: 15px; font-size: 11px; font-weight: 900; cursor: pointer; border-bottom: 3px solid transparent; }
+        .tab-admin.active { border-color: #3b82f6; color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+    </style>
+</head>
+<body class="p-5 pb-10">
+
+    <div class="flex items-center justify-between mb-8 pt-4">
+        <div>
+            <h1 class="text-2xl font-black italic tracking-tighter uppercase">SONNY <span class="text-blue-500">ADMIN</span></h1>
+            <p class="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Gestion des Flux</p>
+        </div>
+        <div class="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-900/20">
+            <i class="fa-solid fa-user-shield text-xl"></i>
+        </div>
+    </div>
+
+    <div class="flex mb-8 bg-slate-800 rounded-xl overflow-hidden">
+        <div id="tabRecharge" onclick="renderAdmin('recharge')" class="tab-admin active uppercase">Recharges</div>
+        <div id="tabRetrait" onclick="renderAdmin('retrait')" class="tab-admin uppercase">Retraits</div>
+    </div>
+
+    <div id="adminList">
+        </div>
+
+    <script>
+        function renderAdmin(type) {
+            // UI Update
+            document.getElementById('tabRecharge').classList.toggle('active', type === 'recharge');
+            document.getElementById('tabRetrait').classList.toggle('active', type === 'retrait');
+
+            const container = document.getElementById('adminList');
+            container.innerHTML = "";
+
+            const key = type === 'recharge' ? 'admin_recharges' : 'admin_retraits';
+            let data = JSON.parse(localStorage.getItem(key)) || [];
+
+            if(data.length === 0) {
+                container.innerHTML = `<p class="text-center py-20 text-gray-500 font-bold text-xs uppercase">Aucune demande en attente</p>`;
+                return;
+            }
+
+            data.forEach((item, index) => {
+                if(item.status !== "EN ATTENTE") return;
+
+                if(type === 'recharge') {
+                    // AFFICHAGE RECHARGE AVEC MESSAGE COLLÉ
+                    container.innerHTML += `
+                    <div class="admin-card">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="bg-blue-900 text-blue-300 text-[8px] px-2 py-1 rounded-md font-black uppercase">${item.method}</span>
+                            <span class="text-[10px] font-bold text-gray-400 font-mono">${item.date}</span>
+                        </div>
+                        <h2 class="text-xl font-black mb-2">${parseFloat(item.montant).toLocaleString()} CDF</h2>
+                        <p class="text-[9px] font-bold text-gray-500 uppercase mb-1">Expéditeur: ${item.numeroExpediteur}</p>
+                        
+                        <div class="bg-black/50 p-4 rounded-xl mb-4 border border-white/5">
+                            <p class="text-[10px] text-gray-400 font-bold uppercase mb-2 italic">Message de preuve collé :</p>
+                            <p class="text-[11px] font-medium text-blue-100 leading-relaxed">${item.messagePreuve}</p>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button onclick="validerAction('recharge', ${index})" class="btn-check flex-1 uppercase">Confirmer</button>
+                            <button onclick="supprimerAction('recharge', ${index})" class="btn-delete flex-1 uppercase">Rejeter</button>
+                        </div>
+                    </div>`;
+                } else {
+                    // AFFICHAGE RETRAIT
+                    container.innerHTML += `
+                    <div class="admin-card">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="bg-green-900 text-green-300 text-[8px] px-2 py-1 rounded-md font-black uppercase">Retrait</span>
+                            <span class="text-[10px] font-bold text-gray-400 font-mono">${item.date}</span>
+                        </div>
+                        <h2 class="text-xl font-black mb-1">${parseFloat(item.montant).toLocaleString()} CDF</h2>
+                        <div class="bg-blue-500/10 p-3 rounded-xl mb-4">
+                            <p class="text-[10px] font-black text-blue-400 uppercase">Vers le compte :</p>
+                            <p class="text-sm font-black text-white">${item.nomCompte}</p>
+                            <p class="text-xs font-bold text-gray-400 font-mono">${item.numeroCompte}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="validerAction('retrait', ${index})" class="btn-check flex-1 uppercase">Paiement Effectué</button>
+                            <button onclick="supprimerAction('retrait', ${index})" class="btn-delete flex-1 uppercase">Refuser</button>
+                        </div>
+                    </div>`;
+                }
+            });
+        }
+
+        function validerAction(type, index) {
+            const key = type === 'recharge' ? 'admin_recharges' : 'admin_retraits';
+            let data = JSON.parse(localStorage.getItem(key));
+            
+            data[index].status = "SUCCÈS";
+            
+            // Si c'est une recharge, on active le droit au retrait et on ajoute le solde
+            if(type === 'recharge') {
+                localStorage.setItem('droitRetrait', 'true');
+                let solde = parseFloat(localStorage.getItem('userSolde')) || 0;
+                localStorage.setItem('userSolde', solde + parseFloat(data[index].montant));
+            }
+
+            localStorage.setItem(key, JSON.stringify(data));
+            alert("Action validée avec succès !");
+            renderAdmin(type);
+        }
+
+        function supprimerAction(type, index) {
+            if(!confirm("Êtes-vous sûr de vouloir rejeter cette demande ?")) return;
+            const key = type === 'recharge' ? 'admin_recharges' : 'admin_retraits';
+            let data = JSON.parse(localStorage.getItem(key));
+            data[index].status = "ÉCHEC";
+            localStorage.setItem(key, JSON.stringify(data));
+            renderAdmin(type);
+        }
+
+        window.onload = () => renderAdmin('recharge');
+    </script>
+</body>
+</html>
